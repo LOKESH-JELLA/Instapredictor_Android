@@ -82,8 +82,7 @@ public class MainActivity extends AppCompatActivity
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        Fragment fragment1 = new HomeFragment();
-        moveToFragment(fragment1);
+
         refresh = (ImageView) findViewById(R.id.refresh);
         settings = (ImageView) findViewById(R.id.settings);
         caltime = (ImageView) findViewById(R.id.caltime);
@@ -91,6 +90,22 @@ public class MainActivity extends AppCompatActivity
         editor = pref1.edit();
         pos = pref1.getString("pos", "");
 
+        if(savedInstanceState==null){
+            Fragment fragment4 = new HomeFragment();
+            moveToFragment(fragment4);
+            Calendar calendar = Calendar.getInstance();
+            SimpleDateFormat mdformat = new SimpleDateFormat("HH:mm:ss");
+            String strDate = mdformat.format(calendar.getTime());
+
+            mYear = calendar.get(Calendar.YEAR);
+            mMonth = calendar.get(Calendar.MONTH);
+            mDay = calendar.get(Calendar.DAY_OF_MONTH);
+            GlobalDeclaration.date1 = mDay + "/" + mMonth + "/" + mYear;
+            GlobalDeclaration.time1 = strDate;
+            date = (mMonth + 1) + ":" + mDay + ":" + mYear + ":" + strDate;
+            editor.putString("date", date); // Storing string
+            editor.commit();
+        }
 
         refresh.setOnClickListener(new View.OnClickListener() {
             @Override
