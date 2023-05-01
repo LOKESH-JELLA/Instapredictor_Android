@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".Panchangamfragment">
+
+    <!-- TODO: Update blank fragment layout -->
+  <!--  <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+       >-->
+<RelativeLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+        <WebView
+            android:id="@+id/panchangam"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+
+            ></WebView>
+    <ProgressBar
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/progressBar"
+        android:clickable="false"
+        android:theme="@style/Base.Theme.AppCompat"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true" />
+
+</RelativeLayout>
+    <!--</LinearLayout>-->
+   <!-- <WebView
+        android:id="@+id/adver"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1.2"
+        android:layout_marginTop="5dp"></WebView>-->
+
+</FrameLayout>
