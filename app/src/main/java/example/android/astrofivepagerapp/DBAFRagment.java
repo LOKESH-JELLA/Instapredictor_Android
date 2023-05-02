@@ -19,8 +19,6 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationRequest;
 
 import static android.content.Context.LOCATION_SERVICE;
 
@@ -40,14 +38,10 @@ public class DBAFRagment extends Fragment {
     private static final String ARG_PARAM2 = "param2";
     WebView panchangam;
     // TODO: Rename and change types of parameters
-    double latitude;
     double tz;
     String date;
-    double longitude;
 
 
-    Location mLastLocation;
-    LocationRequest mLocationRequest;
     private static final int REQUEST_LOCATION_TURN_ON = 2000;
     boolean markerClicked;
     TextView tvLocInfo;

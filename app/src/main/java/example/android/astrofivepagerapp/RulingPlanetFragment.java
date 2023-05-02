@@ -18,8 +18,6 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationRequest;
 
 import static android.content.Context.LOCATION_SERVICE;
 
@@ -42,15 +40,11 @@ public class RulingPlanetFragment extends Fragment {
     private String mParam1;
     private String mParam2;
 
-    double latitude;
+
     double tz;
     String date;
-    double longitude;
 
-    GoogleApiClient mGoogleApiClient;
-    Location mLastLocation;
-    LocationRequest mLocationRequest;
-    private static final int REQUEST_LOCATION_TURN_ON = 2000;
+
     boolean markerClicked;
     TextView tvLocInfo;
     Button submitBtn;
@@ -110,41 +104,6 @@ pb=(ProgressBar)v.findViewById(R.id.progressBar);
 
         progressDialog = CustomProgressDialog.getInstance();
 
-        //  Log.e("tz", String.valueOf(tz));
-       /* Calendar cal = Calendar.getInstance();
-        Date currentTime = cal.getInstance().getTime();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MM:dd:yyyy:HH:mm:ss");
-        date = dateFormat.format(currentTime);
-        Log.e("Currentdatetime", String.valueOf(date));
-
-        TimeZone timezone = TimeZone.getDefault();
-        Log.e("tz", String.valueOf(timezone.getRawOffset()));
-        tz=(timezone.getRawOffset()/(60.0 * 1000.00) / 60.0);
-        Log.e("tz", String.valueOf(tz));
-*/
-
-
-        /* TimeZone.getTimeZone("UTC").getOffset();*/
-
-      /*  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            checkLocationPermission();
-        }
-
-        try {
-            if (!CheckGooglePlayServices()) {
-                getActivity().finish();
-                Toast.makeText(getActivity(), "Google play services not exist in your device", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-
-        try {
-            turnOnLocation();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }*/
         SharedPreferences pref = getActivity().getSharedPreferences("MyPref", 0); // 0 - for private mode
         editor = pref.edit();
         String chartid = pref.getString("chartid", "");
@@ -203,202 +162,7 @@ pb.setVisibility(View.VISIBLE);
 pb.setVisibility(View.GONE);
         }
     }
- /*   private void turnOnLocation() {
-        GoogleApiClient googleApiClient = new GoogleApiClient.Builder(getActivity()).addApi(LocationServices.API).build();
-        googleApiClient.connect();
-        LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setInterval(10000);
-        locationRequest.setFastestInterval(10000 / 2);
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder().addLocationRequest(locationRequest);
-        builder.setAlwaysShow(true);
 
-        PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(googleApiClient, builder.build());
-        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
-            @Override
-            public void onResult(LocationSettingsResult result) {
-                final Status status = result.getStatus();
-                switch (status.getStatusCode()) {
-                    case LocationSettingsStatusCodes.SUCCESS:
-
-                        buildGoogleApiClient();
-                        break;
-                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                        try {
-                            status.startResolutionForResult(getActivity(), REQUEST_LOCATION_TURN_ON);
-                        } catch (IntentSender.SendIntentException e) {
-                            Toast.makeText(getActivity(), "Something Went Wrong", Toast.LENGTH_SHORT).show();
-                        }
-                        break;
-                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                        Toast.makeText(getActivity(), "Something Went Wrong", Toast.LENGTH_SHORT).show();
-                        break;
-                    default: {
-                        Intent i = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                        startActivity(i);
-                        break;
-                    }
-                }
-            }
-        });
-
-    }
-
-    private boolean CheckGooglePlayServices() {
-        GoogleApiAvailability googleAPI = GoogleApiAvailability.getInstance();
-        int result = googleAPI.isGooglePlayServicesAvailable(getActivity());
-        if (result != ConnectionResult.SUCCESS) {
-            if (googleAPI.isUserResolvableError(result)) {
-                googleAPI.getErrorDialog(getActivity(), result, 0).show();
-            }
-            return false;
-        }
-        return true;
-    }
-
-
-    private boolean requestPermissions() {
-        boolean requestFlag = false;
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    PERMISSION_REQUEST_CODE);
-            requestFlag = false;
-        } else {
-            requestFlag = true;
-        }
-        return requestFlag;
-    }
-
-
-    protected synchronized void buildGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(getActivity())
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .build();
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    public void onConnected(Bundle bundle) {
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(1000);
-        mLocationRequest.setFastestInterval(1000);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        }
-    }
-
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        mLastLocation = location;
-
-
-        latitude = location.getLatitude();
-        longitude = location.getLongitude();
-        Log.e("Latitude", String.valueOf(latitude));
-        Log.e("Longitude", String.valueOf(longitude));
-        if (mGoogleApiClient != null) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-        }
-    }
-
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-
-    }
-
-    public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
-
-    public boolean checkLocationPermission() {
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
-                    Manifest.permission.ACCESS_FINE_LOCATION)) {
-                ActivityCompat.requestPermissions(getActivity(),
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_LOCATION);
-
-
-            } else {
-                ActivityCompat.requestPermissions(getActivity(),
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_LOCATION);
-            }
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
-                    if (ContextCompat.checkSelfPermission(getActivity(),
-                            Manifest.permission.ACCESS_FINE_LOCATION)
-                            == PackageManager.PERMISSION_GRANTED) {
-
-                        if (mGoogleApiClient == null) {
-                            buildGoogleApiClient();
-                        }
-                    }
-
-                }
-            }
-        }
-    }
-
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQUEST_LOCATION_TURN_ON) {
-            if (resultCode == RESULT_OK) {
-                Intent intent = getActivity().getIntent();
-                getActivity().finish();
-                startActivity(intent);
-            } else {
-                new AlertDialog.Builder(getActivity()).setCancelable(false).setTitle("Please turn on the location to continue").setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                        turnOnLocation();
-
-                    }
-                }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    @Override
-
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                        getActivity().finish();
-                    }
-                }).show();
-
-
-            }
-        }
-    }*/
     // TODO: Rename method, update argument and hook method into UI event
     public void onButtonPressed(Uri uri) {
         if (mListener != null) {

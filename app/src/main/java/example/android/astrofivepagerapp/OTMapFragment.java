@@ -2,15 +2,25 @@ package example.android.astrofivepagerapp;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
 import android.provider.Settings;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.core.content.ContextCompat;
@@ -24,36 +34,33 @@ import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ApiException;
+
+import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResult;
+import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
+import com.google.android.gms.location.Priority;
+import com.google.android.gms.tasks.Task;
 
 import static android.app.Activity.RESULT_OK;
 
-public class OTMapFragment extends Fragment
-        implements GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+public class OTMapFragment extends Fragment {
 
-    double latitude;
-    double longitude;
-
-    GoogleApiClient mGoogleApiClient;
-    Location mLastLocation;
-    LocationRequest mLocationRequest;
+    LocationRequest locationRequest;
+    FusedLocationProviderClient fusedLocationProviderClient;
+    private ActivityResultLauncher<IntentSenderRequest> resolutionForResult;
+    private double latitude=0.0;
+    private double longitude=0.0;
+    int locationInterval = 1000;
     private static final int REQUEST_LOCATION_TURN_ON = 2000;
-    boolean markerClicked;
-    TextView tvLocInfo;
-    Button submitBtn;
-    private static final int PERMISSION_REQUEST_CODE = 200;
-
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -65,225 +72,170 @@ public class OTMapFragment extends Fragment
                              Bundle savedInstanceState) {
         // Inflate the layout for getBaseContext() fragment
         View rootView = inflater.inflate(R.layout.fragment_hora, container, false);
-        requestPermissions();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            checkLocationPermission();
+
+        if (!CheckGooglePlayServices()) {
+            Toast.makeText(requireActivity(), R.string.google_play_services, Toast.LENGTH_SHORT).show();
+            requireActivity().finish();
+        }
+        try {
+            //calling location request for peroid of time
+            locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, locationInterval)
+                    .setWaitForAccurateLocation(false)
+                    .setMinUpdateIntervalMillis(locationInterval)
+                    .setMaxUpdateDelayMillis(locationInterval)
+                    .build();
+            getCurrentLocation();
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
 
-        try {
-            if (!CheckGooglePlayServices()) {
-                getActivity().finish();
-                Toast.makeText(getActivity(), "Google play services not exist in your device", Toast.LENGTH_SHORT).show();
+        resolutionForResult = registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(), result -> {
+            if(result.getResultCode() == RESULT_OK){
+                getCurrentLocation();
+            }else {
+                turnOnGPS();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        });
 
-
-        try {
-            turnOnLocation();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
         return rootView;
     }
 
-    private void turnOnLocation() {
-        GoogleApiClient googleApiClient = new GoogleApiClient.Builder(getActivity()).addApi(LocationServices.API).build();
-        googleApiClient.connect();
-        LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setInterval(10000);
-        locationRequest.setFastestInterval(10000 / 2);
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder().addLocationRequest(locationRequest);
+    private void getCurrentLocation() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ActivityCompat.checkSelfPermission(requireActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                if (isGPSEnabled()) {
+
+                    LocationServices.getFusedLocationProviderClient(requireActivity())
+                            .requestLocationUpdates(locationRequest, new LocationCallback() {
+                                @Override
+                                public void onLocationResult(@NonNull LocationResult locationResult) {
+                                    super.onLocationResult(locationResult);
+
+                                    LocationServices.getFusedLocationProviderClient(requireActivity())
+                                            .removeLocationUpdates(this);
+
+                                    if (locationResult.getLocations().size() > 0) {
+                                        int index = locationResult.getLocations().size() - 1;
+                                        latitude = locationResult.getLocations().get(index).getLatitude();
+                                        longitude = locationResult.getLocations().get(index).getLongitude();
+
+                                    }
+                                }
+                            }, Looper.getMainLooper());
+
+
+                } else {
+                    turnOnGPS();
+                }
+
+            } else {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+            }
+        }
+
+    }
+
+    private void turnOnGPS() {
+
+
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest);
         builder.setAlwaysShow(true);
 
-        PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(googleApiClient, builder.build());
-        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
-            @Override
-            public void onResult(LocationSettingsResult result) {
-                final Status status = result.getStatus();
-                switch (status.getStatusCode()) {
-                    case LocationSettingsStatusCodes.SUCCESS:
+        Task<LocationSettingsResponse> result = LocationServices.getSettingsClient(requireActivity())
+                .checkLocationSettings(builder.build());
 
-                        buildGoogleApiClient();
-                        break;
+        result.addOnCompleteListener(task -> {
+
+            try {
+                LocationSettingsResponse response = task.getResult(ApiException.class);
+                Log.e("LOCATION response", String.valueOf(response));
+
+            } catch (ApiException e) {
+
+                switch (e.getStatusCode()) {
                     case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+
+
+                        ResolvableApiException resolvableApiException = (ResolvableApiException) e;
                         try {
-                            status.startResolutionForResult(getActivity(), REQUEST_LOCATION_TURN_ON);
-                        } catch (IntentSender.SendIntentException e) {
-                            Toast.makeText(getActivity(), "Something Went Wrong", Toast.LENGTH_SHORT).show();
+                            resolvableApiException.startResolutionForResult(requireActivity(), REQUEST_LOCATION_TURN_ON);
+                        } catch (IntentSender.SendIntentException ex) {
+                            throw new RuntimeException(ex);
                         }
+                        IntentSenderRequest intentSenderRequest = new IntentSenderRequest.Builder((resolvableApiException).getResolution()).build();
+                        resolutionForResult.launch(intentSenderRequest);
+
                         break;
+
                     case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                        Toast.makeText(getActivity(), "Something Went Wrong", Toast.LENGTH_SHORT).show();
+                        //Device does not have location
                         break;
-                    default: {
-                        Intent i = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                        startActivity(i);
-                        break;
-                    }
                 }
             }
         });
 
     }
 
+    private boolean isGPSEnabled() {
+        boolean isEnabled;
+        LocationManager locationManager = (LocationManager) requireActivity().getSystemService(Context.LOCATION_SERVICE);
+        isEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        return isEnabled;
+
+    }
+    //broadcast receiver for receiving the location off state when disabled from settings or notificationbar
+    private final BroadcastReceiver gpsreceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            try {
+                if (intent != null && intent.getAction() != null && intent.getAction().matches(LocationManager.PROVIDERS_CHANGED_ACTION)) {
+                    LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+                    boolean isGpsEnabled = false;
+                    if (locationManager != null) {
+                        isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                    }
+                    if (locationManager != null) {
+                        boolean isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                        Log.e("error", String.valueOf(isNetworkEnabled));
+                    }
+                    if (!isGpsEnabled) {
+                        getCurrentLocation();
+                    }
+                }
+            } catch (Exception e) {
+                Log.e("error", e.toString());
+            }
+        }
+    };
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        requireActivity().registerReceiver(gpsreceiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        requireActivity().unregisterReceiver(gpsreceiver);
+    }
+
     private boolean CheckGooglePlayServices() {
         GoogleApiAvailability googleAPI = GoogleApiAvailability.getInstance();
-        int result = googleAPI.isGooglePlayServicesAvailable(getActivity());
+        int result = googleAPI.isGooglePlayServicesAvailable(requireActivity());
         if (result != ConnectionResult.SUCCESS) {
             if (googleAPI.isUserResolvableError(result)) {
-                googleAPI.getErrorDialog(getActivity(), result, 0).show();
+                googleAPI.getErrorDialog(this, result, 0).show();
             }
             return false;
         }
         return true;
     }
 
-
-    private boolean requestPermissions() {
-        boolean requestFlag = false;
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    PERMISSION_REQUEST_CODE);
-            requestFlag = false;
-        } else {
-            requestFlag = true;
-        }
-        return requestFlag;
-    }
-
-
-    protected synchronized void buildGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(getActivity())
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .build();
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    public void onConnected(Bundle bundle) {
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(1000);
-        mLocationRequest.setFastestInterval(1000);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        }
-    }
-
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        mLastLocation = location;
-
-
-        latitude = location.getLatitude();
-        longitude = location.getLongitude();
-        Log.e("Latitude", String.valueOf(latitude));
-        if (mGoogleApiClient != null) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-        }
-    }
-
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-
-    }
-
-    public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
-
-    public boolean checkLocationPermission() {
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
-                    Manifest.permission.ACCESS_FINE_LOCATION)) {
-                ActivityCompat.requestPermissions(getActivity(),
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_LOCATION);
-
-
-            } else {
-                ActivityCompat.requestPermissions(getActivity(),
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_LOCATION);
-            }
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
-                    if (ContextCompat.checkSelfPermission(getActivity(),
-                            Manifest.permission.ACCESS_FINE_LOCATION)
-                            == PackageManager.PERMISSION_GRANTED) {
-
-                        if (mGoogleApiClient == null) {
-                            buildGoogleApiClient();
-                        }
-                    }
-
-                }
-            }
-        }
-    }
-
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQUEST_LOCATION_TURN_ON) {
-            if (resultCode == RESULT_OK) {
-                Intent intent = getActivity().getIntent();
-                getActivity().finish();
-                startActivity(intent);
-            } else {
-                new AlertDialog.Builder(getActivity()).setCancelable(false).setTitle("Please turn on the location to continue").setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                        turnOnLocation();
-
-                    }
-                }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    @Override
-
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                        getActivity().finish();
-                    }
-                }).show();
-
-
-            }
-        }
-    }
 
     public interface OnFragmentInteractionListener {
         // TODO: Update argument type and name

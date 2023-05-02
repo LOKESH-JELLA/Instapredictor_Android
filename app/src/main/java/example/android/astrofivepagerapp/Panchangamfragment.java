@@ -19,8 +19,6 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationRequest;
 
 import static android.content.Context.LOCATION_SERVICE;
 
@@ -35,14 +33,14 @@ import static android.content.Context.LOCATION_SERVICE;
  */
 public class Panchangamfragment extends Fragment {
 
-    double latitude;
+
     double tz;
     String date;
-    double longitude;
 
-    GoogleApiClient mGoogleApiClient;
+
+
     Location mLastLocation;
-    LocationRequest mLocationRequest;
+
     private static final int REQUEST_LOCATION_TURN_ON = 2000;
     boolean markerClicked;
     TextView tvLocInfo;
