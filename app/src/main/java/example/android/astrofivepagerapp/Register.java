@@ -54,16 +54,13 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 
-import static example.android.astrofivepagerapp.Progressing.hideProgressDialog;
-import static example.android.astrofivepagerapp.Progressing.showProgressDialog;
-
 public class Register extends AppCompatActivity{
 
     EditText et_name, et_email, et_mobile,et_countrycode;
     Button register;
     SharedPreferences.Editor editor;
     ProgressDialog progressDialog;
-TextView cleardata;
+    TextView cleardata;
     Location mLastLocation;
     LocationRequest mLocationRequest;
     TextInputLayout t_name,t_mobile,t_countrycode,t_email;
@@ -74,6 +71,9 @@ TextView cleardata;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
         getSupportActionBar().hide();
+
+        progressDialog = new ProgressDialog(Register.this);
+
         et_email = (EditText) findViewById(R.id.et_email);
         et_name = (EditText) findViewById(R.id.et_name);
         et_mobile = (EditText) findViewById(R.id.et_mobile);
@@ -114,6 +114,7 @@ TextView cleardata;
             @Override
             public void onClick(View v) {
                 if (validate()) {
+
                     callregister(et_name.getText().toString(), et_email.getText().toString(), /*et_countrycode.getText().toString()+*/et_mobile.getText().toString(),"Paid");
 
                 }
@@ -192,20 +193,18 @@ TextView cleardata;
     }
 
     private void callregister(String name, String emailid, String mobileno,String Type) {
-        progressDialog = showProgressDialog(new ProgressDialog(this), this);
+        progressDialog.show();
         ApiInterface apiGetClippingList = ApiClient.getClient().create(ApiInterface.class);
         Call<Registerresponse> callGetClippingList;
         callGetClippingList = apiGetClippingList.register(name, emailid, mobileno,Type);
         Log.d("", "apiGetCategoryList url : " + callGetClippingList.request().url());
-
         callGetClippingList.enqueue(new Callback<Registerresponse>() {
             @Override
             public void onResponse(Call<Registerresponse> call, Response<Registerresponse> response) {
 
                 try {
-
                     if (response.body() != null) {
-
+                        progressDialog.dismiss();
                             Toast.makeText(Register.this, response.body().getMessage(), Toast.LENGTH_LONG).show();
 
                         editor.putString("email", et_email.getText().toString()); // Storing string
@@ -224,21 +223,23 @@ TextView cleardata;
                             }
                         } else{
                             showResponseAlert("Server not responding", false);
-                            hideProgressDialog(progressDialog);
+                        progressDialog.dismiss();
 
 
-                        }
+
+                    }
                     } catch(Exception e){
-                        hideProgressDialog(progressDialog);
+                    progressDialog.dismiss();
 
-                        e.printStackTrace();
+
+                    e.printStackTrace();
 
                     }
                 }
 
             @Override
             public void onFailure(Call<Registerresponse> call, Throwable t) {
-                hideProgressDialog(progressDialog);
+                progressDialog.dismiss();
                 Toast.makeText(Register.this, "Something went wrong" + t.toString(), Toast.LENGTH_SHORT).show();
 
 
@@ -256,10 +257,13 @@ TextView cleardata;
                     @Override
                     public void onClick(DialogInterface arg0, int arg1) {
                         if (Flag) {
+                            if(progressDialog.isShowing() || progressDialog!=null){
+                                progressDialog.dismiss();
+                            }
                             Intent i = new Intent(Register.this, MainActivity.class);
                             startActivity(i);
                             finish();
-                            hideProgressDialog(progressDialog);
+
                         } else {
                             Toast.makeText(Register.this, "Please try again", Toast.LENGTH_LONG).show();
                         }

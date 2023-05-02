@@ -64,9 +64,7 @@ import static android.content.Context.LOCATION_SERVICE;
  * create an instance of this fragment.
  */
 public class HomeFragment extends Fragment implements OTMapFragment.OnFragmentInteractionListener, fragment_chart_tab.OnFragmentInteractionListener, TimeChartFragment.OnFragmentInteractionListener, Panchangamfragment.OnFragmentInteractionListener, LagnaFragment.OnFragmentInteractionListener, RulingPlanetFragment.OnFragmentInteractionListener, HoraFragment.OnFragmentInteractionListener, DBAFRagment.OnFragmentInteractionListener
-        , GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+       {
     // TODO: Rename parameter arguments, choose names that match
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String ARG_PARAM1 = "param1";
@@ -85,17 +83,11 @@ public class HomeFragment extends Fragment implements OTMapFragment.OnFragmentIn
     Panchangamfragment homeFragment;
     Toolbar toolbar;
     private int mYear, mMonth, mDay, mHour, mMinute, mseconds;
-    double latitude;
+
     double tz;
     //String date;
-    double longitude;
 
-    GoogleApiClient mGoogleApiClient;
-    Location mLastLocation;
-    LocationRequest mLocationRequest;
-    private static final int REQUEST_LOCATION_TURN_ON = 2000;
 
-    private static final int PERMISSION_REQUEST_CODE = 200;
     SharedPreferences pref1;
     SharedPreferences pref;
     ProgressDialog pd;
@@ -162,33 +154,13 @@ public class HomeFragment extends Fragment implements OTMapFragment.OnFragmentIn
         View v= inflater.inflate(R.layout.fragment_home, container, false);
 
 
-
-
         viewPager = (ViewPager) v.findViewById(R.id.viewPager);
 
         tabLayout = (TabLayout) v.findViewById(R.id.tabLayout);
 
 
         Log.e("itemcount", String.valueOf(viewPager.getCurrentItem()));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            checkLocationPermission();
-        }
 
-        try {
-            if (!CheckGooglePlayServices()) {
-                getActivity().finish();
-                Toast.makeText(getActivity(), "Google play services not exist in your device", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-
-        try {
-            turnOnLocation();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
 
         adapter = new TabAdapter(getActivity().getSupportFragmentManager());
         adapter.addFragment(new fragment_chart_tab(), "Chart");
@@ -443,205 +415,7 @@ public class HomeFragment extends Fragment implements OTMapFragment.OnFragmentIn
         alertDialog.show();
     }
 
-    private void turnOnLocation() {
-        GoogleApiClient googleApiClient = new GoogleApiClient.Builder(getActivity()).addApi(LocationServices.API).build();
-        googleApiClient.connect();
-        LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setInterval(10000);
-        locationRequest.setFastestInterval(10000 / 2);
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder().addLocationRequest(locationRequest);
-        builder.setAlwaysShow(true);
 
-        PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(googleApiClient, builder.build());
-        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
-            @Override
-            public void onResult(LocationSettingsResult result) {
-                final Status status = result.getStatus();
-                switch (status.getStatusCode()) {
-                    case LocationSettingsStatusCodes.SUCCESS:
-                        buildGoogleApiClient();
-
-                        break;
-                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                        try {
-                            status.startResolutionForResult(getActivity(), REQUEST_LOCATION_TURN_ON);
-                        } catch (IntentSender.SendIntentException e) {
-                            Toast.makeText(getActivity(), "Something Went Wrong", Toast.LENGTH_SHORT).show();
-                        }
-                        break;
-                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                        Toast.makeText(getActivity(), "Something Went Wrong", Toast.LENGTH_SHORT).show();
-                        break;
-                    default: {
-                        Intent i = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                        startActivity(i);
-                        break;
-                    }
-                }
-            }
-        });
-
-    }
-
-    private boolean CheckGooglePlayServices() {
-        GoogleApiAvailability googleAPI = GoogleApiAvailability.getInstance();
-        int result = googleAPI.isGooglePlayServicesAvailable(getActivity());
-        if (result != ConnectionResult.SUCCESS) {
-            if (googleAPI.isUserResolvableError(result)) {
-                googleAPI.getErrorDialog(getActivity(), result, 0).show();
-            }
-            return false;
-        }
-        return true;
-    }
-
-
-    private void requestPermissions() {
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    PERMISSION_REQUEST_CODE);
-        } else {
-            turnOnLocation();
-        }
-    }
-
-
-    protected synchronized void buildGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(getActivity())
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .build();
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    public void onConnected(Bundle bundle) {
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(1000);
-        mLocationRequest.setFastestInterval(1000);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        }
-    }
-
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        mLastLocation = location;
-
-
-        latitude = location.getLatitude();
-        longitude = location.getLongitude() * -1;
-        Log.e("mLatitude", String.valueOf(latitude));
-        Log.e("mLongitude", String.valueOf(longitude));
-        if (mGoogleApiClient != null) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-        }
-        if (latitude != 0.0 && longitude != 0.0) {
-
-            editor.putString("latitude", String.valueOf(latitude)); // Storing string
-            editor.putString("longitude", String.valueOf(longitude)); // Storing string
-            editor.commit();
-        }
-    }
-
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-
-    }
-
-    public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
-
-    public boolean checkLocationPermission() {
-        if (ContextCompat.checkSelfPermission(getActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
-                    Manifest.permission.ACCESS_FINE_LOCATION)) {
-                ActivityCompat.requestPermissions(getActivity(),
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_LOCATION);
-
-
-            } else {
-                ActivityCompat.requestPermissions(getActivity(),
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_LOCATION);
-            }
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
-                    if (ContextCompat.checkSelfPermission(getActivity(),
-                            Manifest.permission.ACCESS_FINE_LOCATION)
-                            == PackageManager.PERMISSION_GRANTED) {
-
-                        if (mGoogleApiClient == null) {
-                            buildGoogleApiClient();
-                        }
-                    }
-
-                }
-            }
-        }
-    }
-
-
-   /* @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQUEST_LOCATION_TURN_ON) {
-            if (resultCode == RESULT_OK) {
-                Intent intent = this.getIntent();
-                this.finish();
-                startActivity(intent);
-            } else {
-                new AlertDialog.Builder(getApplicationContext()).setCancelable(false).setTitle("Please turn on the location to continue").setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                        turnOnLocation();
-
-                    }
-                }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    @Override
-
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                        Main_new.this.finish();
-                    }
-                }).show();
-
-
-            }
-        }
-    }*/
 
 
   /*  public void initpopup_settings() {

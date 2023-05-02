@@ -136,6 +136,8 @@ editor.commit();*/
         String queryurl ="lat=" + latitude + "&Lon=" + longitude + "&tz=" + tz + "&Mydate=" + date + "&mychartMethod=" + chartid + "&myayanmsha=" + ayanmshaid + "&isBhavaMadhya=" + bhavaMadhyaid + "&lang=" +langid+"&Placename="+Placename+"&Nodetype="+nodeid;
         String queryurl1="lat=" + latitude + "&Lon=" + longitude + "&tz=" + tz + "&Mydate=" + date + "&mychartMethod=" + "0" + "&myayanmsha=" + "0" + "&isBhavaMadhya=" + "1" + "&lang=" +"En"+"&Placename="+Placename+"&Nodetype="+"0";
 
+        Log.d("url",queryurl);
+        Log.d("url1",queryurl1);
         WebView mywebview = (WebView) v.findViewById(R.id.panchangam);
         //WebView mywebview1 = (WebView) v.findViewById(R.id.adver);
         mywebview.setWebViewClient(new CustomWebViewClient());

@@ -1,22 +1,51 @@
 package example.android.astrofivepagerapp;
 
+import android.Manifest;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.app.TimePickerDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.IntentSender;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.appcompat.app.AlertDialog;
+
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.ResolvableApiException;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
+import com.google.android.gms.location.Priority;
+import com.google.android.gms.tasks.Task;
 import com.google.android.material.navigation.NavigationView;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -43,6 +72,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, HomeFragment.OnFragmentInteractionListener, infoFragment.OnFragmentInteractionListener, goPremiumFragment.OnFragmentInteractionListener, PrivacyPolicyFragment.OnFragmentInteractionListener, OTMapFragment.OnFragmentInteractionListener, fragment_chart_tab.OnFragmentInteractionListener, TimeChartFragment.OnFragmentInteractionListener, Panchangamfragment.OnFragmentInteractionListener, LagnaFragment.OnFragmentInteractionListener, RulingPlanetFragment.OnFragmentInteractionListener, HoraFragment.OnFragmentInteractionListener, DBAFRagment.OnFragmentInteractionListener, SubmitTecketFragment.OnFragmentInteractionListener {
@@ -75,6 +105,14 @@ public class MainActivity extends AppCompatActivity
     private int mYear, mMonth, mDay, mHour, mMinute, mseconds;
     String date;
     String bhavaMadhyaid_set;
+    int locationInterval = 1000;
+    private static final int REQUEST_LOCATION_TURN_ON = 2000;
+    LocationRequest locationRequest;
+    FusedLocationProviderClient fusedLocationProviderClient;
+    private ActivityResultLauncher<IntentSenderRequest> resolutionForResult;
+    private double latitude=0.0;
+    private double longitude=0.0;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,23 +127,33 @@ public class MainActivity extends AppCompatActivity
         pref1 = getSharedPreferences("MyPref", 0); // 0 - for private mode
         editor = pref1.edit();
         pos = pref1.getString("pos", "");
-
-        if(savedInstanceState==null){
-            Fragment fragment4 = new HomeFragment();
-            moveToFragment(fragment4);
-            Calendar calendar = Calendar.getInstance();
-            SimpleDateFormat mdformat = new SimpleDateFormat("HH:mm:ss");
-            String strDate = mdformat.format(calendar.getTime());
-
-            mYear = calendar.get(Calendar.YEAR);
-            mMonth = calendar.get(Calendar.MONTH);
-            mDay = calendar.get(Calendar.DAY_OF_MONTH);
-            GlobalDeclaration.date1 = mDay + "/" + mMonth + "/" + mYear;
-            GlobalDeclaration.time1 = strDate;
-            date = (mMonth + 1) + ":" + mDay + ":" + mYear + ":" + strDate;
-            editor.putString("date", date); // Storing string
-            editor.commit();
+        if (!CheckGooglePlayServices()) {
+            Toast.makeText(MainActivity.this, R.string.google_play_services, Toast.LENGTH_SHORT).show();
+            finish();
         }
+        try {
+            //calling location request for peroid of time
+            locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, locationInterval)
+                    .setWaitForAccurateLocation(false)
+                    .setMinUpdateIntervalMillis(locationInterval)
+                    .setMaxUpdateDelayMillis(locationInterval)
+                    .build();
+            getCurrentLocation();
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        resolutionForResult = registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(), result -> {
+            if(result.getResultCode() == RESULT_OK){
+                getCurrentLocation();
+            }else {
+                turnOnGPS();
+            }
+        });
+
+
+
 
         refresh.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -115,7 +163,6 @@ public class MainActivity extends AppCompatActivity
                 Calendar calendar = Calendar.getInstance();
                 SimpleDateFormat mdformat = new SimpleDateFormat("HH:mm:ss");
                 String strDate = mdformat.format(calendar.getTime());
-
 
                 mYear = calendar.get(Calendar.YEAR);
                 mMonth = calendar.get(Calendar.MONTH);
@@ -166,6 +213,181 @@ public class MainActivity extends AppCompatActivity
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
+    }
+
+    private boolean CheckGooglePlayServices() {
+        GoogleApiAvailability googleAPI = GoogleApiAvailability.getInstance();
+        int result = googleAPI.isGooglePlayServicesAvailable(this);
+        if (result != ConnectionResult.SUCCESS) {
+            if (googleAPI.isUserResolvableError(result)) {
+                Objects.requireNonNull(googleAPI.getErrorDialog(this, result, 0)).show();
+            }
+            return false;
+        }
+        return true;
+
+    }
+    private void getCurrentLocation() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ActivityCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                if (isGPSEnabled()) {
+
+                    LocationServices.getFusedLocationProviderClient(MainActivity.this)
+                            .requestLocationUpdates(locationRequest, new LocationCallback() {
+                                @Override
+                                public void onLocationResult(@NonNull LocationResult locationResult) {
+                                    super.onLocationResult(locationResult);
+
+                                    LocationServices.getFusedLocationProviderClient(MainActivity.this)
+                                            .removeLocationUpdates(this);
+
+                                    if (locationResult.getLocations().size() > 0) {
+                                        int index = locationResult.getLocations().size() - 1;
+                                         latitude = locationResult.getLocations().get(index).getLatitude();
+                                         longitude = locationResult.getLocations().get(index).getLongitude();
+                                        if (latitude != 0.0 && longitude != 0.0) {
+
+                                            editor.putString("latitude", String.valueOf(latitude)); // Storing string
+                                            editor.putString("longitude", String.valueOf(longitude)); // Storing string
+                                            editor.commit();
+
+                                                Fragment fragment4 = new HomeFragment();
+                                                moveToFragment(fragment4);
+                                                Calendar calendar = Calendar.getInstance();
+                                                SimpleDateFormat mdformat = new SimpleDateFormat("HH:mm:ss");
+                                                String strDate = mdformat.format(calendar.getTime());
+
+                                                mYear = calendar.get(Calendar.YEAR);
+                                                mMonth = calendar.get(Calendar.MONTH);
+                                                mDay = calendar.get(Calendar.DAY_OF_MONTH);
+                                                GlobalDeclaration.date1 = mDay + "/" + mMonth + "/" + mYear;
+                                                GlobalDeclaration.time1 = strDate;
+                                                date = (mMonth + 1) + ":" + mDay + ":" + mYear + ":" + strDate;
+                                                editor.putString("date", date); // Storing string
+                                                editor.commit();
+
+                                        }
+
+                                    }
+                                }
+                            }, Looper.getMainLooper());
+
+
+                } else {
+                    turnOnGPS();
+                }
+
+            } else {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+            }
+        }
+
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (isGPSEnabled()) {
+                    getCurrentLocation();
+                } else {
+                    turnOnGPS();
+                }
+            } else {
+                getCurrentLocation();
+            }
+        } else {
+            getCurrentLocation();
+        }
+
+
+    }
+
+    private void turnOnGPS() {
+
+
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest);
+        builder.setAlwaysShow(true);
+
+        Task<LocationSettingsResponse> result = LocationServices.getSettingsClient(getApplicationContext())
+                .checkLocationSettings(builder.build());
+
+        result.addOnCompleteListener(task -> {
+
+            try {
+                LocationSettingsResponse response = task.getResult(ApiException.class);
+                Log.e("LOCATION response", String.valueOf(response));
+
+            } catch (ApiException e) {
+
+                switch (e.getStatusCode()) {
+                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+
+
+                        ResolvableApiException resolvableApiException = (ResolvableApiException) e;
+                        try {
+                            resolvableApiException.startResolutionForResult(MainActivity.this, REQUEST_LOCATION_TURN_ON);
+                        } catch (IntentSender.SendIntentException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                        IntentSenderRequest intentSenderRequest = new IntentSenderRequest.Builder((resolvableApiException).getResolution()).build();
+                        resolutionForResult.launch(intentSenderRequest);
+
+                        break;
+
+                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                        //Device does not have location
+                        break;
+                }
+            }
+        });
+
+    }
+
+    private boolean isGPSEnabled() {
+        boolean isEnabled;
+        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        isEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        return isEnabled;
+
+    }
+    //broadcast receiver for receiving the location off state when disabled from settings or notificationbar
+    private final BroadcastReceiver gpsreceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            try {
+                if (intent != null && intent.getAction() != null && intent.getAction().matches(LocationManager.PROVIDERS_CHANGED_ACTION)) {
+                    LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+                    boolean isGpsEnabled = false;
+                    if (locationManager != null) {
+                        isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                    }
+                    if (locationManager != null) {
+                        boolean isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                        Log.e("error", String.valueOf(isNetworkEnabled));
+                    }
+                    if (!isGpsEnabled) {
+                        getCurrentLocation();
+                    }
+                }
+            } catch (Exception e) {
+                Log.e("error", e.toString());
+            }
+        }
+    };
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        registerReceiver(gpsreceiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        unregisterReceiver(gpsreceiver);
     }
 
 
@@ -810,5 +1032,25 @@ public class MainActivity extends AppCompatActivity
 
         layout.show();
 
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Fragment fragment4 = new HomeFragment();
+        moveToFragment(fragment4);
+        Calendar calendar = Calendar.getInstance();
+        SimpleDateFormat mdformat = new SimpleDateFormat("HH:mm:ss");
+        String strDate = mdformat.format(calendar.getTime());
+
+
+        mYear = calendar.get(Calendar.YEAR);
+        mMonth = calendar.get(Calendar.MONTH);
+        mDay = calendar.get(Calendar.DAY_OF_MONTH);
+        GlobalDeclaration.date1 = mDay + "/" + mMonth + "/" + mYear;
+        GlobalDeclaration.time1 = strDate;
+        date = (mMonth + 1) + ":" + mDay + ":" + mYear + ":" + strDate;
+        editor.putString("date", date); // Storing string
+        editor.commit();
     }
 }
