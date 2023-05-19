@@ -117,7 +117,6 @@ public class SplashActivity extends AppCompatActivity {
             if (ActivityCompat.checkSelfPermission(SplashActivity.this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
 
                 if (isGPSEnabled()) {
-
                     LocationServices.getFusedLocationProviderClient(SplashActivity.this)
                             .requestLocationUpdates(locationRequest, new LocationCallback() {
                                 @Override
@@ -132,7 +131,6 @@ public class SplashActivity extends AppCompatActivity {
                                         latitude = locationResult.getLocations().get(index).getLatitude();
                                         longitude = locationResult.getLocations().get(index).getLongitude();
                                         if (latitude != 0.0 && longitude != 0.0) {
-
                                             editor.putString("latitude", String.valueOf(latitude)); // Storing string
                                             editor.putString("longitude", String.valueOf(longitude)); // Storing string
                                             editor.commit();

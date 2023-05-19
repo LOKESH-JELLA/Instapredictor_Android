@@ -245,7 +245,7 @@ public class MainActivity extends AppCompatActivity
                                     if (locationResult.getLocations().size() > 0) {
                                         int index = locationResult.getLocations().size() - 1;
                                          latitude = locationResult.getLocations().get(index).getLatitude();
-                                         longitude = locationResult.getLocations().get(index).getLongitude();
+                                         longitude = locationResult.getLocations().get(index).getLongitude() * -1;
                                         if (latitude != 0.0 && longitude != 0.0) {
 
                                             editor.putString("latitude", String.valueOf(latitude)); // Storing string
